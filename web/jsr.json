@@ -1,7 +1,7 @@
 {
   "name": "@corbet-foss/ccht",
   "version": "0.2.8",
-  "license": "LGPL-3.0-only WITH LGPL-3.0-linking-exception",
+  "license": "LGPL-3.0-only",
   "exports": {
     ".": "./index.js",
     "./auth": "./src/auth.ts",

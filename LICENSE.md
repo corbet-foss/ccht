@@ -24,8 +24,4 @@ when distributing those components.
 
 Previously distributed source retains its original grants, including any promised
 future license. Tags v0.1.0 and v0.2.0 predate the linking exception and remain
-plain LGPL-3.0-only. The [original FSL notice](https://github.com/corbet-labs/ccht/blob/a3faeaa180078faeefdd5b2af2190cdbcab684b8/LICENSE.md)
-remains attached to its original source. A repository copy is retained at
-`LICENSES/FSL-1.1-ALv2.txt` for historical reference and excluded from the current
-crate package. It is not an alternative grant for new LGPL-covered work.
-Existing commits and artifacts are not rewritten.
+plain LGPL-3.0-only. Existing commits and artifacts are not rewritten.

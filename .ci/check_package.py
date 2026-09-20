@@ -51,8 +51,16 @@ with tempfile.TemporaryDirectory(prefix="ccht-package-", dir=os.environ.get("TMP
     for name, expected in required_notices.items():
         if (source / name).read_bytes() != expected:
             raise ValueError(f"Packaged license notice differs: {name}")
-    if any("FSL" in path.name for path in source.rglob("*")):
-        raise ValueError("The new crate must not include the historical FSL license")
+    packaged_licenses = sorted(
+        path.name for path in (source / "LICENSES").iterdir() if path.is_file()
+    )
+    if packaged_licenses != [
+        "GPL-3.0-only.txt",
+        "LGPL-3.0-linking-exception.txt",
+        "LGPL-3.0-only WITH LGPL-3.0-linking-exception.txt",
+        "LGPL-3.0-only.txt",
+    ]:
+        raise ValueError("Packaged license inventory differs from the current grant")
     consumer = root / "consumer"
     (consumer / "src").mkdir(parents=True)
     (consumer / "Cargo.toml").write_text(
@@ -86,7 +94,6 @@ report = {
         name: hashlib.sha256(contents).hexdigest()
         for name, contents in required_notices.items()
     },
-    "historical_fsl_in_archive": False,
 }
 output = Path(os.environ["CARGO_HOME"]) / "ccid-artifacts" / os.environ["CI_COMMIT_SHA"]
 output.mkdir(parents=True, exist_ok=True)

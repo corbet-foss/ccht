@@ -2,7 +2,7 @@
 
 Thank you for contributing. This one page keeps reuse simple for everyone.
 
-1. **Grant.** You grant Julian Y. Richard Corbet and the corbet-labs
+1. **Grant.** You grant Julian Y. Richard Corbet and the corbet-foss
    projects a perpetual, worldwide, non-exclusive, royalty-free license to
    use, reproduce, modify, distribute, and sublicense your contribution,
    including under different licenses (see 2).
