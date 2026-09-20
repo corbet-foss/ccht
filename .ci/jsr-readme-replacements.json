@@ -1,0 +1,6 @@
+[
+  {
+    "original": "Version 0.2.0 requires an explicit `wasm` URL or bytes on first initialization.",
+    "replacement": "For JSR, pass an explicit `wasm` URL or bytes when creating the first conversation."
+  }
+]

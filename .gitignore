@@ -1,0 +1,4 @@
+target/
+web/wasm/
+web/node_modules/
+__pycache__/

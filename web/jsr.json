@@ -1,0 +1,32 @@
+{
+  "name": "@corbet-labs/ccht",
+  "version": "0.2.8",
+  "license": "LGPL-3.0-only WITH LGPL-3.0-linking-exception",
+  "exports": {
+    ".": "./index.js",
+    "./auth": "./src/auth.ts",
+    "./dock": "./src/dock.ts",
+    "./components/AccountConnection.svelte": "./src/components/AccountConnection.svelte",
+    "./components/ChatDock.svelte": "./src/components/ChatDock.svelte",
+    "./components/Dock.svelte": "./src/components/Dock.svelte",
+    "./components/StepConfig.svelte": "./src/components/StepConfig.svelte"
+  },
+  "publish": {
+    "include": [
+      "index.js",
+      "index.d.ts",
+      "package.json",
+      "src/**",
+      "wasm/**",
+      "source/**",
+      "source/.cargo/**",
+      "source/.ci/**",
+      "LICENSE",
+      "LICENSE.md",
+      "LICENSES/**",
+      "README.md",
+      "THIRD-PARTY.md",
+      "jsr.json"
+    ]
+  }
+}

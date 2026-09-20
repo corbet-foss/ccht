@@ -1,0 +1,44 @@
+schema = 1
+project = "ccht"
+
+[checks.core]
+kind = "commands"
+commands = [["cargo", "test", "--locked", "--no-default-features"], ["cargo", "check", "--locked", "--no-default-features", "--features", "web", "--target", "wasm32-unknown-unknown"]]
+
+[checks.web]
+kind = "commands"
+commands = [["python3", ".ci/check_web.py"]]
+
+[checks.rust]
+kind = "cargo"
+actions = ["fmt", "test", "clippy"]
+all_features = true
+toolchain = "system"
+
+[checks.licenses]
+kind = "commands"
+commands = [["python3", ".ci/license_inventory.py"]]
+
+[checks.package]
+kind = "commands"
+commands = [["python3", ".ci/check_package.py"]]
+
+[checks.jsr-package]
+kind = "commands"
+commands = [["python3", ".ci/check_jsr.py"]]
+
+[checks.jsr-registry]
+kind = "commands"
+commands = [["python3", ".ci/check_jsr_registry.py"]]
+
+[checks.python-package]
+kind = "commands"
+commands = [["python3", ".ci/check_python.py"]]
+
+[checks.python-registry]
+kind = "commands"
+commands = [["python3", ".ci/check_python_registry.py"]]
+
+[checks.python-prepare]
+kind = "commands"
+commands = [["python3", ".ci/check_python.py", "--resolve-only"]]

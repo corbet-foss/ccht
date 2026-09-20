@@ -1,0 +1,10 @@
+[package]
+name = "ccht-wasm-bundle"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+license = "LGPL-3.0-only WITH LGPL-3.0-linking-exception"
+
+[dependencies]
+wasm-bindgen-cli-support = "=0.2.128"

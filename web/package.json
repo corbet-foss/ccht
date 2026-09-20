@@ -1,0 +1,49 @@
+{
+  "name": "@corbet-labs/ccht",
+  "version": "0.2.8",
+  "description": "Reusable conversations for your applications, powered by the shared Rust/Wasm model",
+  "license": "LGPL-3.0-only WITH LGPL-3.0-linking-exception",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    },
+    "./auth": {
+      "types": "./src/auth.ts",
+      "import": "./src/auth.ts"
+    },
+    "./dock": {
+      "types": "./src/dock.ts",
+      "import": "./src/dock.ts"
+    },
+    "./components/AccountConnection.svelte": "./src/components/AccountConnection.svelte",
+    "./components/ChatDock.svelte": "./src/components/ChatDock.svelte",
+    "./components/Dock.svelte": "./src/components/Dock.svelte",
+    "./components/StepConfig.svelte": "./src/components/StepConfig.svelte",
+    "./ccht_bg.wasm": "./wasm/ccht_bg.wasm"
+  },
+  "files": ["index.js", "index.d.ts", "src/", "wasm/", "source/", "LICENSE", "LICENSE.md", "LICENSES/", "README.md", "THIRD-PARTY.md"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/corbet-labs/ccht.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "bun test src/dock.test.ts src/auth.test.ts && vitest run"
+  },
+  "peerDependencies": {
+    "svelte": "^5"
+  },
+  "sideEffects": false,
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^6",
+    "@testing-library/svelte": "^5",
+    "jsdom": "^26",
+    "vitest": "^3"
+  }
+}
