@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { createConversation } from '@corbet-labs/ccht';
+import { createConversation } from '@corbet-foss/ccht';
 
-const wasm = await readFile(new URL(import.meta.resolve('@corbet-labs/ccht/ccht_bg.wasm')));
+const wasm = await readFile(new URL(import.meta.resolve('@corbet-foss/ccht/ccht_bg.wasm')));
 const creator = await createConversation('creator', { wasm });
 const critic = await createConversation('critic');
 const event = (sequence, value, conversation_id = 'creator') => ({

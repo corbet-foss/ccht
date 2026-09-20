@@ -114,7 +114,7 @@ assert len(folded) == len(set(folded)), "JSR paths must not differ only in casin
 
 output = Path(os.environ["CARGO_HOME"]) / "ccid-artifacts" / os.environ["CI_COMMIT_SHA"] / "jsr"
 output.mkdir(parents=True, exist_ok=True)
-origin_archive = output / f"corbet-labs-ccht-{inputs['version']}.tgz"
+origin_archive = output / f"corbet-foss-ccht-{inputs['version']}.tgz"
 origin_archive.write_bytes(original_archive)
 with tempfile.TemporaryDirectory(prefix="ccht-jsr-", dir=os.environ.get("TMPDIR")) as directory:
     stage = Path(directory) / "package"
@@ -137,15 +137,15 @@ with tempfile.TemporaryDirectory(prefix="ccht-jsr-", dir=os.environ.get("TMPDIR"
     consumer = Path(directory) / "consumer"
     consumer.mkdir()
     (consumer / "deno.json").write_text(json.dumps({"imports": {
-        "@corbet-labs/ccht": "../package/index.js",
-        "@corbet-labs/ccht/ccht_bg.wasm": "../package/wasm/ccht_bg.wasm",
+        "@corbet-foss/ccht": "../package/index.js",
+        "@corbet-foss/ccht/ccht_bg.wasm": "../package/wasm/ccht_bg.wasm",
     }}))
     shutil.copy2(root / ".ci/web-consumer.mjs", consumer / "check.mjs")
     run("deno", "run", "--allow-read", "check.mjs", cwd=consumer)
-    (consumer / "types.ts").write_text("""import { createConversation, type WireEvent, type ConversationSnapshot } from '@corbet-labs/ccht';
+    (consumer / "types.ts").write_text("""import { createConversation, type WireEvent, type ConversationSnapshot } from '@corbet-foss/ccht';
 const event: WireEvent = { version: 1, conversation_id: 'types', request_id: 'one', sequence: 1,
   event: { kind: 'completed', stop_reason: 'end_turn' } };
-const wasm = new URL(import.meta.resolve('@corbet-labs/ccht/ccht_bg.wasm'));
+const wasm = new URL(import.meta.resolve('@corbet-foss/ccht/ccht_bg.wasm'));
 const conversation = await createConversation('types', { wasm });
 const snapshot: ConversationSnapshot = conversation.applyEvent(event);
 const text: string = snapshot.turns[0].text;
@@ -159,7 +159,7 @@ console.log('Deno Wasm URL loading passed.');
 """)
     run("deno", "check", "types.ts", cwd=consumer)
     run("deno", "run", "--allow-read", "types.ts", cwd=consumer)
-    archive = output / f"corbet-labs-ccht-{inputs['version']}-jsr.tar.gz"
+    archive = output / f"corbet-foss-ccht-{inputs['version']}-jsr.tar.gz"
     with archive.open("wb") as stream:
         with gzip.GzipFile(fileobj=stream, mode="wb", mtime=0) as compressed:
             with tarfile.open(fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT) as bundle:

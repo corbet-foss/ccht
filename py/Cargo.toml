@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.88"
 license = "LGPL-3.0-only WITH LGPL-3.0-linking-exception"
 description = "Python bindings for the ccht conversation model"
-repository = "https://github.com/corbet-labs/ccht"
+repository = "https://github.com/corbet-foss/ccht"
 publish = false
 readme = "README.md"
 

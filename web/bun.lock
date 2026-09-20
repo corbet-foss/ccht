@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@corbet-labs/ccht",
+      "name": "@corbet-foss/ccht",
       "devDependencies": {
         "@sveltejs/vite-plugin-svelte": "^6",
         "@testing-library/svelte": "^5",

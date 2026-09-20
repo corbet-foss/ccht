@@ -1,15 +1,15 @@
 # ccht on JSR
 
 This package shares the exact JavaScript, TypeScript declarations and Wasm
-module from `@corbet-labs/ccht` on npm. Its LGPL source kit and notices are
+module from `@corbet-foss/ccht` on npm. Its LGPL source kit and notices are
 included; the source archive uses XZ compression to fit JSR's package limit.
 
 Save this as `example.ts`:
 
 ```ts
-import { createConversation } from "jsr:@corbet-labs/ccht@0.2.0";
+import { createConversation } from "jsr:@corbet-foss/ccht@0.2.0";
 
-const wasm = new URL("https://jsr.io/@corbet-labs/ccht/0.2.0/wasm/ccht_bg.wasm");
+const wasm = new URL("https://jsr.io/@corbet-foss/ccht/0.2.0/wasm/ccht_bg.wasm");
 const conversation = await createConversation("workspace/creator", { wasm });
 console.log(conversation.snapshot());
 conversation.free();

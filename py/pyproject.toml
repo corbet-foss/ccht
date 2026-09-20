@@ -17,9 +17,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/corbet-labs/ccht#readme"
-Repository = "https://github.com/corbet-labs/ccht"
-Issues = "https://github.com/corbet-labs/ccht/issues"
+Homepage = "https://github.com/corbet-foss/ccht#readme"
+Repository = "https://github.com/corbet-foss/ccht"
+Issues = "https://github.com/corbet-foss/ccht/issues"
 
 [tool.maturin]
 bindings = "pyo3"
