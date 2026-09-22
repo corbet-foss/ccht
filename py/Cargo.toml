@@ -1,6 +1,6 @@
 [package]
 name = "ccht-python"
-version = "0.2.8"
+version = "0.2.9"
 edition = "2024"
 rust-version = "1.88"
 license = "LGPL-3.0-only WITH LGPL-3.0-linking-exception"
@@ -18,5 +18,5 @@ crate-type = ["cdylib"]
 resolver = "3"
 
 [dependencies]
-ccht = { version = "=0.2.8", default-features = false }
+ccht = { version = "=0.2.9", default-features = false }
 pyo3 = { version = "=0.29.2", features = ["abi3-py310", "extension-module"] }

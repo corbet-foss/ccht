@@ -10,6 +10,7 @@ pub mod drivers;
 mod env;
 pub mod pool;
 mod session;
+pub mod well_known;
 
 #[cfg(test)]
 mod tests;
@@ -95,6 +96,47 @@ impl AgentCommand {
             args,
             env: self.env,
         })
+    }
+
+    /// Describe this spawn command as a stdio transport and validate it.
+    ///
+    /// Types and validation only; the spawn itself stays with
+    /// [`NativeClient::connect`]. An empty program is rejected here, matching
+    /// the connect-time `InvalidOptions` for the same shape, so valid
+    /// commands see no behavior change. Sockets never appear on this path:
+    /// native connectors spawn a local agent speaking ACP over stdio.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::TransportError`] when the program is empty or the
+    /// address has an unsupported shape.
+    pub fn validate_stdio(&self) -> std::result::Result<(), crate::TransportError> {
+        use crate::{StdioTransport, Transport as _};
+        let program = self.program.to_string_lossy().into_owned();
+        StdioTransport::new(program, self.args.clone()).validate()
+    }
+
+    /// Seed missing entries from the parent process environment, then filter
+    /// through `profile` in place.
+    ///
+    /// [`NativeClient::connect`] inherits the host environment and only blanks
+    /// known API credential variables on its own; seeding every parent
+    /// variable first and then blanking non-allowlisted entries enforces the
+    /// allowlist (for example `GITHUB_TOKEN`, which the SDK alone would
+    /// inherit, becomes `""`). Explicit entries already on the command win
+    /// over the parent snapshot.
+    pub fn seal_parent_env(&mut self, profile: EnvProfile) {
+        for (key, value) in std::env::vars() {
+            self.env.entry(key).or_insert(value);
+        }
+        profile.apply_to_command(self);
+    }
+
+    /// Builder variant of [`AgentCommand::seal_parent_env`].
+    #[must_use]
+    pub fn with_sealed_parent_env(mut self, profile: EnvProfile) -> Self {
+        self.seal_parent_env(profile);
+        self
     }
 }
 
@@ -233,6 +275,22 @@ impl NativeError {
             Self::EventsTaken => "events_taken",
             Self::UnknownPermission => "unknown_permission",
             Self::InvalidPermissionOption => "invalid_permission_option",
+        }
+    }
+
+    /// Shared login state for this failure.
+    ///
+    /// Only [`NativeError::AuthenticationRequired`] carries login
+    /// information; every other failure maps to
+    /// [`crate::AuthState::Unknown`]. This is the call-error side of the same
+    /// convergence [`crate::auth_state_from_code`] provides for wire codes,
+    /// so applications never compare the `"authentication_required"` literal.
+    #[must_use]
+    pub fn auth_state(&self) -> crate::AuthState {
+        if *self == Self::AuthenticationRequired {
+            crate::AuthState::Unauthenticated
+        } else {
+            crate::AuthState::Unknown
         }
     }
 }

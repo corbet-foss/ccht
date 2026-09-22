@@ -232,7 +232,7 @@ dependencies = [
 
 [[package]]
 name = "ccht"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "agent-client-protocol",
  "agent-client-protocol-schema",

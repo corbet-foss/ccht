@@ -209,6 +209,39 @@ pub trait LoginDriver: Send {
 /// Result returned by login driver operations.
 pub type DriverResult<T> = Result<T, DriverError>;
 
+/// Drive a device-code ceremony to its terminal state.
+///
+/// Calls `start`; when the vendor answers with [`LoginState::Authenticated`]
+/// or [`LoginState::Failed`] that state is returned directly. When the vendor
+/// answers with [`LoginState::ChallengeRequired`], the challenge is validated
+/// with [`Challenge::validate`], handed to `on_challenge` for application
+/// display, and then `poll` waits for browser approval whose outcome is
+/// returned.
+///
+/// The application keeps all product copy and result mapping: it renders the
+/// challenge inside `on_challenge` and translates the returned [`LoginState`]
+/// into its own success/failure transitions. This helper only removes the
+/// start/validate/poll sequencing every device-code consumer would otherwise
+/// copy.
+///
+/// # Errors
+///
+/// Returns [`DriverError`] when `start` fails, the challenge has an
+/// unsupported shape, or `poll` fails.
+pub async fn complete_device_login<D: LoginDriver>(
+    driver: &mut D,
+    on_challenge: impl FnOnce(&Challenge),
+) -> DriverResult<LoginState> {
+    match driver.start().await? {
+        state @ (LoginState::Authenticated(_) | LoginState::Failed) => Ok(state),
+        LoginState::ChallengeRequired(challenge) => {
+            challenge.validate()?;
+            on_challenge(&challenge);
+            driver.poll().await
+        }
+    }
+}
+
 /// Resolve a bare program name against the parent process `PATH`.
 ///
 /// Drivers spawn helpers with a cleared minimal environment, so a relative
@@ -301,5 +334,97 @@ mod tests {
         assert!(!AccountInfo::new(None).connected());
         assert!(!AccountInfo::new(Some(String::new())).connected());
         assert!(AccountInfo::new(Some("user@example.com".to_owned())).connected());
+    }
+
+    struct StubDriver {
+        start: LoginState,
+        poll: LoginState,
+        polled: bool,
+    }
+
+    impl StubDriver {
+        fn new(start: LoginState, poll: LoginState) -> Self {
+            Self {
+                start,
+                poll,
+                polled: false,
+            }
+        }
+    }
+
+    impl LoginDriver for StubDriver {
+        async fn start(&mut self) -> DriverResult<LoginState> {
+            Ok(self.start.clone())
+        }
+
+        async fn poll(&mut self) -> DriverResult<LoginState> {
+            self.polled = true;
+            Ok(self.poll.clone())
+        }
+
+        async fn account(&mut self) -> DriverResult<AccountInfo> {
+            Ok(AccountInfo::signed_out())
+        }
+
+        async fn cancel(&mut self) -> DriverResult<()> {
+            Ok(())
+        }
+    }
+
+    fn valid_challenge() -> Challenge {
+        Challenge::new(
+            "https://auth.openai.com/codex/device".to_owned(),
+            "ABCD-1234".to_owned(),
+        )
+    }
+
+    #[tokio::test]
+    async fn device_login_returns_immediate_states_without_a_challenge() {
+        for state in [
+            LoginState::Authenticated(AccountInfo::new(Some("user@example.com".to_owned()))),
+            LoginState::Failed,
+        ] {
+            let mut driver = StubDriver::new(state.clone(), LoginState::Failed);
+            let outcome = complete_device_login(&mut driver, |_| panic!("no challenge expected"))
+                .await
+                .expect("immediate states must succeed");
+            assert_eq!(outcome, state);
+            assert!(!driver.polled);
+        }
+    }
+
+    #[tokio::test]
+    async fn device_login_displays_then_polls_a_valid_challenge() {
+        let challenge = valid_challenge();
+        let authenticated =
+            LoginState::Authenticated(AccountInfo::new(Some("user@example.com".to_owned())));
+        let mut driver = StubDriver::new(
+            LoginState::ChallengeRequired(challenge.clone()),
+            authenticated.clone(),
+        );
+        let outcome = complete_device_login(&mut driver, |shown| {
+            assert_eq!(shown, &challenge);
+        })
+        .await
+        .expect("polled approval must succeed");
+        assert_eq!(outcome, authenticated);
+        assert!(driver.polled);
+    }
+
+    #[tokio::test]
+    async fn device_login_rejects_a_bad_challenge_before_display_or_poll() {
+        let mut driver = StubDriver::new(
+            LoginState::ChallengeRequired(Challenge::new(
+                "http://auth.openai.com/codex/device".to_owned(),
+                "ABCD-1234".to_owned(),
+            )),
+            LoginState::Failed,
+        );
+        let error =
+            complete_device_login(&mut driver, |_| panic!("bad challenge must not display"))
+                .await
+                .expect_err("bad challenge shape must fail");
+        assert!(matches!(error, DriverError::InvalidOptions(_)));
+        assert!(!driver.polled);
     }
 }

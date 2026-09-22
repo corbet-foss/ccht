@@ -43,6 +43,22 @@ impl AuthState {
     }
 }
 
+/// Map a wire/transport failure code to shared login state.
+///
+/// The only code carrying login information is `"authentication_required"`
+/// (see [`crate::native::NativeError::code`]); every other failure carries
+/// no login information and maps to [`AuthState::Unknown`]. Both native call
+/// errors and [`crate::Event::Error`] codes converge here so applications
+/// never compare the literal twice.
+#[must_use]
+pub fn auth_state_from_code(code: &str) -> AuthState {
+    if code == "authentication_required" {
+        AuthState::Unauthenticated
+    } else {
+        AuthState::Unknown
+    }
+}
+
 /// Storage failure of a [`CredentialsProvider`].
 #[derive(Clone, Debug, thiserror::Error, Eq, PartialEq)]
 pub enum AuthError {
@@ -431,5 +447,19 @@ mod tests {
         assert!(!AuthState::Unknown.authenticated());
         assert!(!AuthState::Unauthenticated.authenticated());
         assert!(AuthState::Authenticated { account: None }.authenticated());
+    }
+
+    #[test]
+    fn wire_codes_map_to_shared_state() {
+        assert_eq!(
+            auth_state_from_code("authentication_required"),
+            AuthState::Unauthenticated
+        );
+        assert_eq!(auth_state_from_code("rate_limited"), AuthState::Unknown);
+        assert_eq!(auth_state_from_code(""), AuthState::Unknown);
+        assert_ne!(
+            auth_state_from_code("authentication_required"),
+            AuthState::Authenticated { account: None }
+        );
     }
 }

@@ -665,3 +665,73 @@ async fn driver_debug_and_errors_omit_key_material() {
     let rendered = format!("{failing:?}");
     assert!(!rendered.contains(key));
 }
+
+#[test]
+fn native_error_maps_to_shared_login_state() {
+    use crate::AuthState;
+    assert_eq!(
+        NativeError::AuthenticationRequired.auth_state(),
+        AuthState::Unauthenticated
+    );
+    assert_eq!(
+        NativeError::AuthenticationRequired.code(),
+        "authentication_required"
+    );
+    for error in [
+        NativeError::Closed,
+        NativeError::Timeout,
+        NativeError::Busy,
+        NativeError::Unsupported("extra step"),
+        NativeError::Protocol(-32603),
+    ] {
+        assert_eq!(error.auth_state(), AuthState::Unknown);
+        assert_ne!(error.code(), "authentication_required");
+    }
+}
+
+#[test]
+fn agent_command_validates_stdio_shape_without_spawning() {
+    use crate::TransportError;
+    let command = AgentCommand::new("codex-acp").args(["--acp"]);
+    command.validate_stdio().unwrap();
+    assert_eq!(command.args, vec!["--acp".to_owned()]);
+    let empty = AgentCommand::new("");
+    let error = empty.validate_stdio().unwrap_err();
+    assert_eq!(
+        error,
+        TransportError::InvalidAddress("stdio program must not be empty")
+    );
+}
+
+#[test]
+fn seal_parent_env_keeps_explicit_entries_and_blanks_secrets() {
+    let mut command = AgentCommand::new("agent");
+    command.env.insert("PATH".into(), "/explicit/bin".into());
+    command
+        .env
+        .insert("OPENAI_API_KEY".into(), "super-secret".into());
+    command.seal_parent_env(EnvProfile::strict());
+    assert_eq!(
+        command.env.get("PATH").map(String::as_str),
+        Some("/explicit/bin"),
+        "explicit spawn overrides must survive parent seeding"
+    );
+    assert_eq!(
+        command.env.get("OPENAI_API_KEY").map(String::as_str),
+        Some(""),
+        "secrets must be blanked even when set explicitly"
+    );
+    assert_eq!(command.program.to_str(), Some("agent"));
+}
+
+#[test]
+fn sealed_parent_env_builder_matches_in_place_variant() {
+    let mut inplace = AgentCommand::new("agent");
+    inplace.env.insert("PATH".into(), "/explicit/bin".into());
+    inplace.seal_parent_env(EnvProfile::strict());
+    let mut built = AgentCommand::new("agent");
+    built.env.insert("PATH".into(), "/explicit/bin".into());
+    let built = built.with_sealed_parent_env(EnvProfile::strict());
+    assert_eq!(built.env, inplace.env);
+    assert_eq!(built.program, inplace.program);
+}

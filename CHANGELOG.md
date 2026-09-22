@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.2.9 - 2026-09-22
+
+- ADDED: `auth_state_from_code()` — map a wire/transport failure code to
+  shared login state (`"authentication_required"` to `Unauthenticated`, every
+  other code to `Unknown`). Both native call errors and `Event::Error` codes
+  converge here so applications never compare the literal twice.
+- ADDED: `NativeError::auth_state()` — the call-error side of the same
+  convergence, for `NativeError` values instead of wire codes.
+- ADDED: `AgentCommand::validate_stdio()` — describe the spawn command as a
+  stdio transport and validate it without I/O. Rejects an empty program
+  before spawning, matching the connect-time `InvalidOptions` shape.
+- ADDED: `AgentCommand::seal_parent_env()` / `with_sealed_parent_env()` —
+  seed missing entries from the parent process environment, then filter
+  through an `EnvProfile`. Explicit entries win; non-allowlisted values
+  (including ambient secrets the SDK alone would inherit) become `""`.
+- ADDED: `native::well_known` — pure-data table of maintained upstream ACP
+  executables (`codex`, `gemini`, `copilot`, `claude`, `opencode`) with the
+  exact arguments selecting ACP mode. No I/O, no installation, no login
+  commands; `find()` / `command()` turn an id into an `AgentCommand`.
+- ADDED: `drivers::complete_device_login()` — drive a device-code ceremony
+  to its terminal state (`start`, validated challenge handed to an
+  application display callback, `poll`). Product copy and result mapping stay
+  with the application.
+
 ## 0.2.8 - 2026-09-19
 
 - FIXED: `SessionPool` tracks snapshot event sequence numbers per turn
