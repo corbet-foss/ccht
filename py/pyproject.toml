@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ccht"
-version = "0.2.9"
+version = "0.2.10"
 description = "The shared Rust conversation model for Python chat applications"
 readme = "README.md"
 license = "LGPL-3.0-only WITH LGPL-3.0-linking-exception"

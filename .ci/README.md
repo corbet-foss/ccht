@@ -40,7 +40,7 @@ and `SHA256SUMS`.
 
 `.ci/publish.py` runs the exact shared publisher resource from the release
 workflow's verified ccid archive
-([import and publication contract](https://github.com/corbet-libs/ccid/blob/27c248aefa3c7198be6716a884d290c717774b21/adapters/registry-publish.md)).
+([import and publication contract](https://github.com/corbet-libs/ccid/blob/3175c51005006f6050033a55b3da033333ecf84d/adapters/registry-publish.md)).
 A pushed `vX.Y.Z` tag runs `.github/workflows/release.yml`; see
 [releasing](../docs/releasing.md) for its two phases. The manual Crow `release`
 workflow remains the fallback route for the same bundle: supply

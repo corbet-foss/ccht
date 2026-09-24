@@ -38,7 +38,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  CCID_REVISION: 27c248aefa3c7198be6716a884d290c717774b21
+  CCID_REVISION: 3175c51005006f6050033a55b3da033333ecf84d
   RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
   RELEASE_COMPLETE: ${{ github.event_name == 'workflow_dispatch' && inputs.complete }}
 

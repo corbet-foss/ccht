@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.10 - 2026-09-25
+
+- 0.2.9 reached crates.io only. Its npm upload of the 19 MB tarball timed out
+  in the publisher, and npm now refuses that version, so npm, JSR and PyPI go
+  straight to 0.2.10. No library changes since 0.2.9.
+- Release CI pins corbet-libs/ccid@3175c51, whose registry request timeouts
+  scale with the upload size.
+
 ## 0.2.9 - 2026-09-24
 
 - Repository moved to github.com/corbet-foss/ccht; registry metadata points

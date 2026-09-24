@@ -31,7 +31,7 @@ tag stays the release identity for all four.
      `release-config,rust,core,licenses,rust-package,js-package`.
    - `bundle` (`contents: write`) requires tag == `v` + version, imports the
      crate and npm archive with `.ci/publish.py bundle` (the
-     [shared import contract](https://github.com/corbet-libs/ccid/blob/27c248aefa3c7198be6716a884d290c717774b21/adapters/registry-publish.md)),
+     [shared import contract](https://github.com/corbet-libs/ccid/blob/3175c51005006f6050033a55b3da033333ecf84d/adapters/registry-publish.md)),
      inspects it offline, and creates the GitHub release with
      `publication-bundle.tar`, its `.sha256` and the import receipt
      `publication-bundle.json`.
@@ -87,7 +87,7 @@ repository (for the publication journals), and `NPM_TOKEN` or `PYPI_TOKEN` for
 the selected registry:
 
 ```sh
-tag=vX.Y.Z repo=corbet-foss/ccht rev=27c248aefa3c7198be6716a884d290c717774b21
+tag=vX.Y.Z repo=corbet-foss/ccht rev=3175c51005006f6050033a55b3da033333ecf84d
 work=$(mktemp -d) && cd "$work"
 git clone -q --depth 1 --branch "$tag" "https://github.com/$repo" source
 git clone -q https://github.com/corbet-libs/ccid publisher && git -C publisher checkout -q "$rev"

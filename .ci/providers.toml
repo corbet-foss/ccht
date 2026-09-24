@@ -3,12 +3,12 @@ schema = 1
 [github]
 repository = "corbet-foss/ccht"
 workflow = "ccid.yml"
-workflow_sha256 = "c84d140feb698fc1c419bbe3b2031c7cd23df38966c6df5c6851187ae59d00f6"
+workflow_sha256 = "99be8abd3eb80b4ef6db36f1989bf9a9b872c438d1af0cddb9f6b3c6bfb8ccc3"
 checks = ["rust"]
 platform = "linux-x86_64"
 secret_free = true
 free_eligible = true
-tool_revision = "27c248aefa3c7198be6716a884d290c717774b21"
+tool_revision = "3175c51005006f6050033a55b3da033333ecf84d"
 tool_bootstrap_workflow = "bootstrap.yml"
 tool_bootstrap_sha256 = "d275261db8126e8d579184024a9eb4eaeedb15fcb7801804697d396c48e391ae"
 
