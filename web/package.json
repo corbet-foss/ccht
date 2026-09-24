@@ -1,5 +1,5 @@
 {
-  "name": "@corbet-foss/ccht",
+  "name": "@corbet-labs/ccht",
   "version": "0.2.9",
   "description": "Reusable conversations for your applications, powered by the shared Rust/Wasm model",
   "license": "LGPL-3.0-only WITH LGPL-3.0-linking-exception",

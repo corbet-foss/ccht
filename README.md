@@ -6,7 +6,7 @@ that same model to Wasm. Native hosts connect to installed agents using the
 [official ACP Rust SDK](https://github.com/agentclientprotocol/rust-sdk).
 
 ```text
-Web UI ── @corbet-foss/ccht (Wasm) ── application transport/storage
+Web UI ── @corbet-labs/ccht (Wasm) ── application transport/storage
                                               │
 TUI / native UI ── ccht::Conversation ── ccht::native ── upstream ACP agent
 ```
@@ -152,13 +152,13 @@ object keys; depending on a `Value` map's incidental iteration order is unsafe.
 ## Browser
 
 ```sh
-npm install @corbet-foss/ccht
+npm install @corbet-labs/ccht
 ```
 
 ```js
-import { createConversation } from '@corbet-foss/ccht';
+import { createConversation } from '@corbet-labs/ccht';
 // Vite example: emit the Wasm as a separately replaceable asset.
-import wasmUrl from '@corbet-foss/ccht/ccht_bg.wasm?url';
+import wasmUrl from '@corbet-labs/ccht/ccht_bg.wasm?url';
 
 const conversation = await createConversation('workspace/creator', { wasm: wasmUrl });
 // After your authenticated application transport delivers a ccht WireEvent:
@@ -179,10 +179,10 @@ backend is available and how users authenticate to the application.
 The JSR package exposes the same Rust/Wasm model:
 
 ```ts
-import { createConversation } from 'jsr:@corbet-foss/ccht@0.2.0';
+import { createConversation } from 'jsr:@corbet-labs/ccht@0.2.0';
 
 const conversation = await createConversation('workspace/creator', {
-  wasm: new URL('https://jsr.io/@corbet-foss/ccht/0.2.0/wasm/ccht_bg.wasm'),
+  wasm: new URL('https://jsr.io/@corbet-labs/ccht/0.2.0/wasm/ccht_bg.wasm'),
 });
 ```
 

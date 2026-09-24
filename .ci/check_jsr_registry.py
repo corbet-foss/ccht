@@ -14,8 +14,8 @@ specifier = f"jsr:{name}@{version}"
 wasm_url = f"https://jsr.io/{name}/{version}/wasm/ccht_bg.wasm"
 consumer = (root / ".ci/web-consumer.mjs").read_text()
 consumer = consumer.replace("import { readFile } from 'node:fs/promises';\n", "")
-consumer = consumer.replace("from '@corbet-foss/ccht'", "from " + json.dumps(specifier))
-old_load = "const wasm = await readFile(new URL(import.meta.resolve('@corbet-foss/ccht/ccht_bg.wasm')));"
+consumer = consumer.replace("from '@corbet-labs/ccht'", "from " + json.dumps(specifier))
+old_load = "const wasm = await readFile(new URL(import.meta.resolve('@corbet-labs/ccht/ccht_bg.wasm')));"
 assert consumer.count(old_load) == 1
 consumer = consumer.replace(old_load, "const wasm = new URL(" + json.dumps(wasm_url) + ");")
 with tempfile.TemporaryDirectory(prefix="ccht-jsr-registry-", dir=os.environ.get("TMPDIR")) as directory:

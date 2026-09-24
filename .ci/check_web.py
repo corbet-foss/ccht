@@ -124,7 +124,7 @@ with tempfile.TemporaryDirectory(prefix="ccht-web-", dir=os.environ.get("TMPDIR"
         packed = pack_output[staged_name]
     archive = output / packed["filename"]
     consumer = Path(directory) / "consumer"
-    module = consumer / "node_modules/@corbet-foss/ccht"
+    module = consumer / "node_modules/@corbet-labs/ccht"
     module.mkdir(parents=True)
     with tarfile.open(archive, "r:gz") as bundle:
         for entry in bundle.getmembers():
@@ -134,7 +134,7 @@ with tempfile.TemporaryDirectory(prefix="ccht-web-", dir=os.environ.get("TMPDIR"
             if entry.name:
                 bundle.extract(entry, module, filter="data")
     manifest = json.loads((module / "package.json").read_text())
-    assert manifest["name"] == "@corbet-foss/ccht"
+    assert manifest["name"] == "@corbet-labs/ccht"
     assert manifest["license"] == "LGPL-3.0-only WITH LGPL-3.0-linking-exception"
     assert manifest["version"] == package["version"]
     for name in ("LICENSE", "LICENSES/LGPL-3.0-only.txt", "LICENSES/LGPL-3.0-only WITH LGPL-3.0-linking-exception.txt", "LICENSES/LGPL-3.0-linking-exception.txt", "LICENSES/GPL-3.0-only.txt"):

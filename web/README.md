@@ -1,4 +1,4 @@
-# @corbet-foss/ccht
+# @corbet-labs/ccht
 
 Reusable conversations for your applications, powered by the shared Rust/Wasm model.
 
@@ -11,11 +11,11 @@ entries are product-neutral: no product names, prompts, or
 pricing appear in this package.
 
 ```js
-import { createConversation } from '@corbet-foss/ccht';
-import { isAuthenticated, validateChallenge } from '@corbet-foss/ccht/auth';
-import { createDockManager, validateDockId } from '@corbet-foss/ccht/dock';
-import AccountConnection from '@corbet-foss/ccht/components/AccountConnection.svelte';
-import Dock from '@corbet-foss/ccht/components/Dock.svelte';
+import { createConversation } from '@corbet-labs/ccht';
+import { isAuthenticated, validateChallenge } from '@corbet-labs/ccht/auth';
+import { createDockManager, validateDockId } from '@corbet-labs/ccht/dock';
+import AccountConnection from '@corbet-labs/ccht/components/AccountConnection.svelte';
+import Dock from '@corbet-labs/ccht/components/Dock.svelte';
 ```
 
 The Svelte component ships as source and needs `svelte` `^5` (a peer
@@ -46,7 +46,7 @@ Rule: browser code in this package never spawns agents, performs network I/O,
 or holds ambient authority. Service keys are explicit strings passed by the
 app, and secrets are opaque bytes that are never logged.
 
-## Auth entry (`@corbet-foss/ccht/auth`)
+## Auth entry (`@corbet-labs/ccht/auth`)
 
 Plain types and functions, no DOM access.
 
@@ -126,7 +126,7 @@ an `aria-live="polite"` region announcing challenge arrival, and
 `role="alert"` for the clipboard fallback. The key input is labelled,
 password-masked, and non-persistent.
 
-## Dock entry (`@corbet-foss/ccht/dock`) and component (`Dock.svelte`)
+## Dock entry (`@corbet-labs/ccht/dock`) and component (`Dock.svelte`)
 
 Framework-free dock state plus a generic Svelte 5 edge rail. `DockKind`
 (`'chat' | 'config' | 'custom'`) classifies a dock and `Placement`
@@ -204,7 +204,7 @@ component module:
 ```js
 import ChatDock, {
   defaultChatStatusLabel,
-} from '@corbet-foss/ccht/components/ChatDock.svelte';
+} from '@corbet-labs/ccht/components/ChatDock.svelte';
 ```
 
 `ChatDockMessage` is `{ id, role: 'user' | 'assistant', content,
