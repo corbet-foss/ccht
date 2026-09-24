@@ -5,7 +5,7 @@ project = "ccht"
 kind = "commands"
 commands = [["cargo", "test", "--locked", "--no-default-features"], ["cargo", "check", "--locked", "--no-default-features", "--features", "web", "--target", "wasm32-unknown-unknown"]]
 
-[checks.web]
+[checks.js-package]
 kind = "commands"
 commands = [["python3", ".ci/check_web.py"]]
 
@@ -19,7 +19,7 @@ toolchain = "system"
 kind = "commands"
 commands = [["python3", ".ci/license_inventory.py"]]
 
-[checks.package]
+[checks.rust-package]
 kind = "commands"
 commands = [["python3", ".ci/check_package.py"]]
 
@@ -42,3 +42,13 @@ commands = [["python3", ".ci/check_python_registry.py"]]
 [checks.python-prepare]
 kind = "commands"
 commands = [["python3", ".ci/check_python.py", "--resolve-only"]]
+
+# Manual publication adapter; no product compilation occurs.
+[checks.release]
+kind = "commands"
+commands = [["python3", ".ci/publish.py"]]
+
+# Syntax and manual publication contract; no product build or network.
+[checks.release-config]
+kind = "commands"
+commands = [["python3", ".ci/release-check.py"]]

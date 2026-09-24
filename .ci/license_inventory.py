@@ -2,8 +2,9 @@
 
 import json
 import os
-from pathlib import Path
 import subprocess
+
+from artifact_root import output_directory
 
 
 metadata = json.loads(
@@ -34,13 +35,7 @@ report = {
         if not package["license"] and not package["license_file"]
     ],
 }
-output = (
-    Path(os.environ["CARGO_HOME"])
-    / "ccid-artifacts"
-    / os.environ["CI_COMMIT_SHA"]
-    / "license-inventory.json"
-)
-output.parent.mkdir(parents=True, exist_ok=True)
+output = output_directory() / "license-inventory.json"
 output.write_text(json.dumps(report, indent=2) + "\n")
 print(f"License inventory: {output} ({len(packages)} packages)")
 print(json.dumps({key: value for key, value in report.items() if key != "packages"}))

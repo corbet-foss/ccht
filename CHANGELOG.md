@@ -1,7 +1,15 @@
 # Changelog
 
-## 0.2.9 - 2026-09-22
+## 0.2.9 - 2026-09-24
 
+- Repository moved to github.com/corbet-foss/ccht; registry metadata points
+  there. npm and JSR keep the `@corbet-labs` scope.
+- Releases run from CI: one pushed `v0.2.9` tag publishes Cargo and npm from a
+  reviewed bundle, and a completion run on the same tag adds JSR and PyPI,
+  whose packages are built from the published crate and npm archive
+  (`docs/releasing.md`). This aligns all four registries on 0.2.9.
+- Drop the duplicate `LICENSES/LGPL-3.0-only WITH LGPL-3.0-linking-exception.txt`
+  (identical to `LGPL-3.0-linking-exception.txt`); JSR rejects paths with spaces.
 - ADDED: `auth_state_from_code()` — map a wire/transport failure code to
   shared login state (`"authentication_required"` to `Unauthenticated`, every
   other code to `Unknown`). Both native call errors and `Event::Error` codes

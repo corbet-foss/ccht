@@ -14,6 +14,8 @@ import tarfile
 import tempfile
 import urllib.request
 
+from artifact_root import output_directory
+
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
@@ -112,8 +114,7 @@ assert max(map(len, published.values())) < 20_000_000
 folded = [name.casefold() for name in published]
 assert len(folded) == len(set(folded)), "JSR paths must not differ only in casing"
 
-output = Path(os.environ["CARGO_HOME"]) / "ccid-artifacts" / os.environ["CI_COMMIT_SHA"] / "jsr"
-output.mkdir(parents=True, exist_ok=True)
+output = output_directory("jsr")
 origin_archive = output / f"corbet-labs-ccht-{inputs['version']}.tgz"
 origin_archive.write_bytes(original_archive)
 with tempfile.TemporaryDirectory(prefix="ccht-jsr-", dir=os.environ.get("TMPDIR")) as directory:
@@ -187,7 +188,7 @@ for name in ("README.md", "source/README.md"):
 receipt = {
     "schema": 1, "package": "ccht", "version": inputs["version"],
     "commit": os.environ["CI_COMMIT_SHA"], "source_sha256": os.environ["SOURCE_SHA256"],
-    "check": "jsr-package", "layout": "web-wasm-v1", "tool_revision": os.environ["CCID_REVISION"],
+    "check": "jsr-package", "layout": "web-wasm-v1", "tool_revision": os.environ.get("CCID_REVISION"),
     "artifacts": {archive.name: digest(archive.read_bytes()), origin_archive.name: inputs["archive_sha256"]},
     "original_npm": inputs, "original_npm_artifact": origin_archive.name,
     "published_files": {name: digest(data) for name, data in published.items()},

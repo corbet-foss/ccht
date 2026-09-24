@@ -7,7 +7,7 @@ license = "LGPL-3.0-only WITH LGPL-3.0-linking-exception"
 description = "Reusable conversations for native applications and the web, with upstream ACP agent integration"
 repository = "https://github.com/corbet-foss/ccht"
 readme = "README.md"
-include = ["Cargo.toml", "Cargo.lock", "src/**", "examples/**", "README.md", "CHANGELOG.md", "LICENSE", "LICENSE.md", "LICENSES/LGPL-3.0-only.txt", "LICENSES/LGPL-3.0-only WITH LGPL-3.0-linking-exception.txt", "LICENSES/LGPL-3.0-linking-exception.txt", "LICENSES/GPL-3.0-only.txt", "THIRD-PARTY.md"]
+include = ["Cargo.toml", "Cargo.lock", "src/**", "examples/**", "README.md", "CHANGELOG.md", "LICENSE", "LICENSE.md", "LICENSES/LGPL-3.0-only.txt", "LICENSES/LGPL-3.0-linking-exception.txt", "LICENSES/GPL-3.0-only.txt", "THIRD-PARTY.md"]
 keywords = ["chat", "acp", "agents", "wasm", "streaming"]
 categories = ["development-tools", "web-programming"]
 

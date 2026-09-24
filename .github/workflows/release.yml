@@ -1,0 +1,358 @@
+name: Release
+
+# One pushed vX.Y.Z tag releases every registry whose package can be built from
+# that tag, from one reviewed bundle:
+#   prepare  credential-free checks and package receipts (ci.yml) at the tag
+#   bundle   imports those exact packages, creates the GitHub release with the bundle
+#   publish  reconciles each registry and uploads only missing packages through OIDC
+# ccht ships in two phases of the same version. The tag bundles Cargo and npm.
+# The Python binding resolves the ccht crate from crates.io, and JSR is generated
+# from the published npm archive (.ci/jsr-input.json), so both need a follow-up
+# commit on main after those uploads. Dispatch with the tag and `complete` then
+# prepares JSR and PyPI at that branch and extends the release's bundle; the
+# original tag stays the release identity (docs/releasing.md).
+# Dispatch with a tag alone reconciles and publishes from that release's bundle.
+# Dispatch without a tag rehearses the tag phase for the selected branch; it
+# creates no release and publishes nothing.
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag (vX.Y.Z) to reconcile and publish from its bundle; empty rehearses this branch without a release
+        type: string
+        required: false
+        default: ''
+      complete:
+        description: With a tag, prepare JSR and PyPI at this branch and add them to that release's bundle
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  CCID_REVISION: 27c248aefa3c7198be6716a884d290c717774b21
+  RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+  RELEASE_COMPLETE: ${{ github.event_name == 'workflow_dispatch' && inputs.complete }}
+
+jobs:
+  prepare:
+    if: github.event.repository.private == false && (github.event_name == 'push' || inputs.tag == '' || inputs.complete)
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+    with:
+      checks: ${{ (github.event_name == 'workflow_dispatch' && inputs.complete) && 'release-config,jsr-package,python-package' || 'release-config,rust,core,licenses,rust-package,js-package' }}
+
+  bundle:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      sha256: ${{ steps.bundle.outputs.sha256 }}
+    steps:
+      - name: Check out the release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Check out the exact shared publisher source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: corbet-libs/ccid
+          ref: ${{ env.CCID_REVISION }}
+          path: .release-publisher-source
+          persist-credentials: false
+      - name: Download the prepared packages and receipts
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: ${{ needs.prepare.outputs.artifact }}
+          path: ${{ runner.temp }}/prepared
+      - name: Fetch the tag phase bundle to extend
+        if: env.RELEASE_COMPLETE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$RELEASE_TAG" ]]; then
+            echo '::error::Completing a release requires its existing tag' >&2
+            exit 1
+          fi
+          # A retried completion starts again from the preserved tag phase bundle.
+          existing="$RUNNER_TEMP/existing"
+          assets=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          prefix=publication-bundle
+          if grep -qx 'tag-phase-publication-bundle.tar' <<< "$assets"; then prefix=tag-phase-publication-bundle; fi
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$existing" \
+            --pattern "$prefix.tar" --pattern "$prefix.tar.sha256" --pattern "$prefix.json"
+          if [[ "$prefix" == publication-bundle ]]; then
+            (cd "$existing" && sha256sum --check --strict publication-bundle.tar.sha256)
+            cp "$existing/publication-bundle.tar" "$existing/tag-phase-publication-bundle.tar"
+            cp "$existing/publication-bundle.json" "$existing/tag-phase-publication-bundle.json"
+            sed 's/  publication-bundle\.tar$/  tag-phase-publication-bundle.tar/' "$existing/publication-bundle.tar.sha256" \
+              > "$existing/tag-phase-publication-bundle.tar.sha256"
+          fi
+          (cd "$existing" && sha256sum --check --strict tag-phase-publication-bundle.tar.sha256)
+      - name: Import the exact prepared packages into one reviewed bundle
+        id: bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')
+          if [[ -n "$RELEASE_TAG" && "$RELEASE_TAG" != "v$version" ]]; then
+            echo "::error::Tag $RELEASE_TAG differs from the source version v$version" >&2
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C .release-publisher-source rev-parse HEAD)" = "$CCID_REVISION"
+          CI_TOOL_ARCHIVE="$RUNNER_TEMP/publisher-source.tar"
+          git -C .release-publisher-source archive --format=tar HEAD > "$CI_TOOL_ARCHIVE"
+          CI_TOOL_SHA256=$(sha256sum "$CI_TOOL_ARCHIVE" | cut -d ' ' -f 1)
+          export CI_TOOL_ARCHIVE CI_TOOL_SHA256
+          # Byte-identical to the archive ci.yml hashed for this commit.
+          git archive --format=tar HEAD > "$RUNNER_TEMP/source.tar"
+          python3 - <<'PYTHON'
+          import hashlib
+          import io
+          import json
+          import os
+          from pathlib import Path
+          import tarfile
+          import tomllib
+
+          temp = Path(os.environ['RUNNER_TEMP'])
+          commit = os.environ['GITHUB_SHA']
+          source = temp / 'source.tar'
+          receipt = temp / 'prepared' / 'hosted-run.json'
+          hosted = json.loads(receipt.read_text())
+          if (hosted.get('status') != 'success' or hosted.get('commit') != commit
+                  or hosted.get('source_sha256') != hashlib.sha256(source.read_bytes()).hexdigest()):
+              raise SystemExit('Prepared evidence does not describe this exact successful source')
+          name = tomllib.loads(Path('Cargo.toml').read_text())['package']['name']
+          prepared = temp / 'prepared' / name / commit
+          # Each check exports its packages, receipt, SOURCE_COMMIT and SHA256SUMS
+          # into its own directory below the commit.
+          directories = {'cargo': prepared, 'npm': prepared / 'web', 'jsr': prepared / 'jsr', 'pypi': prepared / 'python'}
+          complete = os.environ['RELEASE_COMPLETE'] == 'true'
+          selected = ('jsr', 'pypi') if complete else ('cargo', 'npm')
+          channels = {registry: {'source_archive': str(source), 'artifacts': str(directories[registry]),
+                                 'hosted_receipt': str(receipt)} for registry in selected}
+          tag_commit = commit
+          if complete:
+              # Re-import the tag phase channels from their reviewed bundle, unchanged.
+              existing = tarfile.open(temp / 'existing' / 'tag-phase-publication-bundle.tar')
+              members = {member.name: member for member in existing.getmembers() if member.isfile()}
+              def read(path):
+                  return existing.extractfile(members[path]).read()
+              manifest = json.loads(read('release.json'))
+              tag_commit = manifest['tag_commit']
+              if set(manifest['channels']) & set(selected):
+                  raise SystemExit('The tag phase bundle already contains ' + ', '.join(sorted(set(manifest['channels']) & set(selected))))
+              for registry, entry in manifest['channels'].items():
+                  directory = temp / 'existing' / registry
+                  directory.mkdir(parents=True)
+                  (directory / 'source.tar').write_bytes(read(entry['source_archive']))
+                  (directory / Path(entry['receipt']).name).write_bytes(read(entry['receipt']))
+                  (directory / 'hosted-run.json').write_bytes(read(entry['hosted_receipt']))
+                  (directory / 'SOURCE_COMMIT').write_text(entry['source_commit'] + '\n')
+                  sums = []
+                  for artifact, item in sorted(entry['artifacts'].items()):
+                      (directory / artifact).write_bytes(read(item['path']))
+                      sums.append(item['sha256'] + '  ' + artifact + '\n')
+                  (directory / 'SHA256SUMS').write_text(''.join(sums))
+                  channels[registry] = {'source_archive': str(directory / 'source.tar'), 'artifacts': str(directory),
+                                        'hosted_receipt': str(directory / 'hosted-run.json')}
+              (temp / 'tag-phase-release.json').write_text(json.dumps(manifest))
+          specification = {'schema': 1, 'repository': os.environ['GITHUB_REPOSITORY'], 'tag_commit': tag_commit,
+                           'channels': channels}
+          (temp / 'import.json').write_text(json.dumps(specification, indent=2) + '\n')
+          PYTHON
+          bundle="$RUNNER_TEMP/publication-bundle.tar"
+          python3 .ci/publish.py bundle --input "$RUNNER_TEMP/import.json" --output "$bundle" > "$RUNNER_TEMP/publication-bundle.json"
+          cat "$RUNNER_TEMP/publication-bundle.json"
+          if [[ "$RELEASE_COMPLETE" == true ]]; then
+            python3 - <<'PYTHON'
+          import json
+          import os
+          from pathlib import Path
+          temp = Path(os.environ['RUNNER_TEMP'])
+          before = json.loads((temp / 'tag-phase-release.json').read_text())
+          after = json.loads((temp / 'publication-bundle.json').read_text())['release']
+          if after['tag_commit'] != before['tag_commit'] or any(
+                  after['channels'].get(registry) != entry for registry, entry in before['channels'].items()):
+              raise SystemExit('Extending the bundle changed a tag phase channel')
+          PYTHON
+          fi
+          sha256=$(sha256sum "$bundle" | cut -d ' ' -f 1)
+          printf '%s  publication-bundle.tar\n' "$sha256" > "$bundle.sha256"
+          python3 .ci/publish.py inspect --bundle "$bundle" --sha256 "$sha256"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+      - name: Create the GitHub release with the bundle
+        if: env.RELEASE_TAG != '' && env.RELEASE_COMPLETE != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          notes="$RUNNER_TEMP/release-notes.md"
+          awk -v heading="## $version" 'index($0, heading " ") == 1 || $0 == heading { found = 1; next }
+            found && /^## / { exit } found { print }' CHANGELOG.md > "$notes"
+          if ! grep -q '[^[:space:]]' "$notes"; then
+            printf 'Release %s.\n' "$RELEASE_TAG" > "$notes"
+          fi
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "${GITHUB_REPOSITORY#*/} $version" --notes-file "$notes" \
+            "$RUNNER_TEMP/publication-bundle.tar" "$RUNNER_TEMP/publication-bundle.tar.sha256" \
+            "$RUNNER_TEMP/publication-bundle.json"
+      - name: Extend the GitHub release bundle
+        if: env.RELEASE_COMPLETE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          existing="$RUNNER_TEMP/existing"
+          # Keep the tag phase bundle as evidence, then publish the extended bundle
+          # under the name every publication route downloads.
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            "$existing/tag-phase-publication-bundle.tar" "$existing/tag-phase-publication-bundle.tar.sha256" \
+            "$existing/tag-phase-publication-bundle.json" 2>/dev/null ||
+            gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' |
+              grep -qx 'tag-phase-publication-bundle.tar'
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+            "$RUNNER_TEMP/publication-bundle.tar" "$RUNNER_TEMP/publication-bundle.tar.sha256" \
+            "$RUNNER_TEMP/publication-bundle.json"
+      - name: Retain the rehearsal bundle
+        if: env.RELEASE_TAG == ''
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: rehearsal-bundle-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/publication-bundle.*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: bundle
+    if: >-
+      !cancelled() && github.event.repository.private == false &&
+      ((github.event_name == 'push' && needs.bundle.result == 'success') ||
+      (github.event_name == 'workflow_dispatch' && inputs.tag != '' &&
+      ((!inputs.complete && needs.bundle.result == 'skipped') || (inputs.complete && needs.bundle.result == 'success'))))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Check out the publication adapter
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Check out the exact shared publisher source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: corbet-libs/ccid
+          ref: ${{ env.CCID_REVISION }}
+          path: .release-publisher-source
+          persist-credentials: false
+      - name: Verify the shared publisher and fetch the release bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREPARED_SHA256: ${{ needs.bundle.outputs.sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C .release-publisher-source rev-parse HEAD)" = "$CCID_REVISION"
+          tool_archive="$RUNNER_TEMP/publisher-source.tar"
+          git -C .release-publisher-source archive --format=tar HEAD > "$tool_archive"
+          echo "CI_TOOL_ARCHIVE=$tool_archive" >> "$GITHUB_ENV"
+          echo "CI_TOOL_SHA256=$(sha256sum "$tool_archive" | cut -d ' ' -f 1)" >> "$GITHUB_ENV"
+          release="$RUNNER_TEMP/release"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$release" \
+            --pattern publication-bundle.tar --pattern publication-bundle.tar.sha256
+          (cd "$release" && sha256sum --check --strict publication-bundle.tar.sha256)
+          sha256=$(cut -d ' ' -f 1 "$release/publication-bundle.tar.sha256")
+          if [[ -n "$PREPARED_SHA256" && "$PREPARED_SHA256" != "$sha256" ]]; then
+            echo '::error::The release bundle differs from the bundle prepared in this run' >&2
+            exit 1
+          fi
+          {
+            echo "RELEASE_BUNDLE=$release/publication-bundle.tar"
+            echo "RELEASE_BUNDLE_SHA256=$sha256"
+            echo "RELEASE_JOURNAL_ROOT=$RUNNER_TEMP/publication-journals"
+          } >> "$GITHUB_ENV"
+      - name: Reconcile exact existing registry bytes
+        id: status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .ci/publish.py status > "$RUNNER_TEMP/publication-status.json"
+          cat "$RUNNER_TEMP/publication-status.json"
+          python3 - <<'PYTHON'
+          import json
+          import os
+          from pathlib import Path
+          result = json.loads((Path(os.environ['RUNNER_TEMP']) / 'publication-status.json').read_text())
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for registry in ('cargo', 'npm', 'jsr', 'pypi'):
+                  missing = bool(result['registries'].get(registry, {}).get('missing'))
+                  output.write(registry + '_missing=' + str(missing).lower() + '\n')
+          PYTHON
+      - name: Obtain short-lived Cargo publishing authentication
+        if: steps.status.outputs.cargo_missing == 'true'
+        id: authentication
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18
+      - name: Publish the inspected Cargo archive
+        if: steps.status.outputs.cargo_missing == 'true'
+        env:
+          RELEASE_CHANNELS: cargo
+          RELEASE_CARGO_AUTH: trusted
+          CARGO_REGISTRY_TOKEN: ${{ steps.authentication.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .ci/publish.py publish
+      # JSR does not depend on the Cargo outcome; the job still fails if either fails.
+      - name: Publish the inspected JSR source through GitHub OIDC
+        if: ${{ !cancelled() && steps.status.outputs.jsr_missing == 'true' }}
+        env:
+          RELEASE_CHANNELS: jsr
+          RELEASE_JSR_AUTH: trusted
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .ci/publish.py publish
+      # npm and PyPI have no trusted publisher rules yet. The operator uploads the
+      # same bundle with registry tokens outside hosted CI (docs/releasing.md).
+      - name: Report registries left for the operator
+        if: ${{ !cancelled() && (steps.status.outputs.npm_missing == 'true' || steps.status.outputs.pypi_missing == 'true') }}
+        env:
+          NPM_MISSING: ${{ steps.status.outputs.npm_missing }}
+          PYPI_MISSING: ${{ steps.status.outputs.pypi_missing }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          deferred=()
+          if [[ "$NPM_MISSING" == true ]]; then deferred+=(npm); fi
+          if [[ "$PYPI_MISSING" == true ]]; then deferred+=(pypi); fi
+          message="Not published here: ${deferred[*]} (no trusted publisher rule yet). Upload publication-bundle.tar from release $RELEASE_TAG as described in docs/releasing.md."
+          echo "::notice title=Deferred registries::$message"
+          printf '%s\n' "$message" >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain inspection and local publication records
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: publication-records-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/publication-status.json
+            ${{ runner.temp }}/publication-journals
+          if-no-files-found: ignore
+          retention-days: 90

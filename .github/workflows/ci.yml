@@ -1,0 +1,251 @@
+name: Manual selected checks
+
+# Public source and registry consumers only. Publication credentials stay outside
+# this workflow; Crow handles inputs that must remain on owned infrastructure.
+# release.yml calls it as its credential-free preparation job, so the receipts
+# describe the exact release source and this workflow file's bytes.
+on:
+  workflow_dispatch:
+    inputs:
+      checks:
+        description: Comma-separated .ci/ccid.toml selectors, in execution order
+        type: string
+        required: true
+        default: rust,core
+  workflow_call:
+    inputs:
+      checks:
+        description: Comma-separated .ci/ccid.toml selectors, in execution order
+        type: string
+        required: true
+    outputs:
+      artifact:
+        description: Name of the uploaded package and receipt artifact
+        value: ${{ jobs.checks.outputs.artifact }}
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    # The npm check builds the Wasm module twice (once from its offline source kit).
+    timeout-minutes: 45
+    outputs:
+      artifact: selected-checks-${{ github.sha }}-${{ github.run_attempt }}
+    env:
+      REQUESTED_CHECKS: ${{ inputs.checks }}
+      RUSTUP_TOOLCHAIN: stable
+      CARGO_BUILD_JOBS: "2"
+      RUST_TEST_THREADS: "2"
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      CI_REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
+      UV_PYTHON: python3
+      UV_PYTHON_DOWNLOADS: never
+    steps:
+      - name: Check out the dispatched source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Validate selection and record source identity
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ARTIFACT_ROOT="$RUNNER_TEMP/release-artifacts"
+          echo "ARTIFACT_ROOT=$ARTIFACT_ROOT" >> "$GITHUB_ENV"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          source_sha256=$(git archive --format=tar HEAD | sha256sum | cut -d ' ' -f 1)
+          export SOURCE_SHA256="$source_sha256"
+          python3 - <<'PYTHON'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import tomllib
+
+          selectors = [part.strip() for part in os.environ['REQUESTED_CHECKS'].split(',')]
+          config = tomllib.loads(Path('.ci/ccid.toml').read_text())
+          if not selectors or any(not part or part not in config['checks'] for part in selectors):
+              raise SystemExit('Select existing .ci/ccid.toml checks; empty selectors are invalid')
+          if len(set(selectors)) != len(selectors):
+              raise SystemExit('Each check may be selected only once')
+          if set(selectors) & {'release'}:
+              raise SystemExit('Publication requires its dedicated route')
+          selected = set(selectors)
+          flags = {
+              'rust': bool(selected & {'rust', 'core', 'licenses', 'rust-package', 'js-package',
+                                       'python-package', 'python-prepare'}),
+              'wasm': bool(selected & {'core', 'js-package'}),
+              'actionlint': 'release-config' in selected,
+              'node': 'js-package' in selected,
+              'deno': bool(selected & {'jsr-package', 'jsr-registry'}),
+              'uv': bool(selected & {'python-package', 'python-registry'}),
+              'patchelf': 'python-package' in selected,
+          }
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for name, enabled in flags.items():
+                  output.write(f'{name}={str(enabled).lower()}\n')
+          with open(os.environ['GITHUB_ENV'], 'a') as environment:
+              environment.write('CI_COMMIT_SHA=' + os.environ['GITHUB_SHA'] + '\n')
+              environment.write('SOURCE_SHA256=' + os.environ['SOURCE_SHA256'] + '\n')
+              environment.write('SELECTED_CHECKS=' + ','.join(selectors) + '\n')
+          inputs = [Path(name) for name in ('Cargo.toml', 'Cargo.lock', 'web/package.json', 'web/bun.lock',
+                                            'web/jsr.json', '.ci/jsr-input.json', 'py/pyproject.toml',
+                                            'py/Cargo.toml', 'py/Cargo.lock')]
+          directory = Path(os.environ['ARTIFACT_ROOT'])
+          directory.mkdir(parents=True, exist_ok=True)
+          receipt = {
+              'schema': 1, 'provider': 'github-actions', 'commit': os.environ['GITHUB_SHA'],
+              'source_sha256': os.environ['SOURCE_SHA256'], 'checks': selectors,
+              'workflow_sha256': hashlib.sha256(Path('.github/workflows/ci.yml').read_bytes()).hexdigest(),
+              'dependency_inputs': {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in inputs if path.is_file()},
+              'tools_selected': flags, 'status': 'prepared',
+              'run_url': f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+          }
+          (directory / 'hosted-run.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          PYTHON
+
+      - name: Set up current stable Rust on the hosted runner
+        if: steps.plan.outputs.rust == 'true'
+        shell: bash
+        run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
+
+      - name: Add the Wasm target
+        if: steps.plan.outputs.wasm == 'true'
+        shell: bash
+        run: rustup target add --toolchain stable wasm32-unknown-unknown
+
+      - name: Reuse Rust dependencies
+        if: steps.plan.outputs.rust == 'true'
+        uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c
+        with:
+          shared-key: hosted-selected-linux
+          cache-bin: false
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      # Package checks vendor the complete locked graph offline, so fetch every
+      # platform's locked sources once before any selected check runs.
+      - name: Fetch the locked Rust sources
+        if: steps.plan.outputs.rust == 'true'
+        shell: bash
+        run: cargo fetch --locked
+
+      - name: Set up Node
+        if: steps.plan.outputs.node == 'true'
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: lts/*
+          package-manager-cache: false
+
+      - name: Set up Deno
+        if: steps.plan.outputs.deno == 'true'
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: 2.x
+
+      - name: Set up uv
+        if: steps.plan.outputs.uv == 'true'
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          version: latest
+          enable-cache: true
+          prune-cache: false
+
+      - name: Set up patchelf for native wheel inspection
+        if: steps.plan.outputs.patchelf == 'true'
+        shell: bash
+        run: sudo apt-get install -y --no-install-recommends patchelf
+
+      - name: Set up Actionlint for release adapter validation
+        if: steps.plan.outputs.actionlint == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOBIN="$RUNNER_TEMP/actionlint-bin" go install github.com/rhysd/actionlint/cmd/actionlint@latest
+          echo "$RUNNER_TEMP/actionlint-bin" >> "$GITHUB_PATH"
+
+      - name: Record the actual hosted environment
+        shell: bash
+        run: |
+          python3 - <<'PYTHON'
+          import json
+          import os
+          from pathlib import Path
+          import platform
+          import subprocess
+          path = Path(os.environ['ARTIFACT_ROOT']) / 'hosted-run.json'
+          receipt = json.loads(path.read_text())
+          commands = [['python3', '--version']]
+          selected = receipt['tools_selected']
+          if selected['rust']:
+              commands += [['rustup', 'run', 'stable', tool, '--version'] for tool in ('rustc', 'cargo')]
+          commands += [[tool, '--version'] for tool in ('node', 'deno', 'uv', 'patchelf') if selected[tool]]
+          if selected['node']:
+              commands += [['npm', '--version']]
+          if selected['actionlint']:
+              commands += [['actionlint', '-version']]
+          receipt['platform'] = platform.platform()
+          receipt['tools'] = {' '.join(command): subprocess.check_output(command, text=True).strip() for command in commands}
+          path.write_text(json.dumps(receipt, indent=2) + '\n')
+          print(json.dumps(receipt, indent=2))
+          PYTHON
+
+      - name: Run the selected repository checks
+        id: checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          IFS=',' read -r -a selectors <<< "$SELECTED_CHECKS"
+          for selector in "${selectors[@]}"; do
+            echo "::group::$selector"
+            case "$selector" in
+              rust)
+                cargo fmt --all -- --check
+                cargo test --locked --all-features
+                cargo clippy --all-targets --all-features --locked -- -D warnings
+                ;;
+              core)
+                cargo test --locked --no-default-features
+                cargo check --locked --no-default-features --features web --target wasm32-unknown-unknown
+                ;;
+              release-config) python3 .ci/release-check.py ;;
+              licenses) python3 .ci/license_inventory.py ;;
+              rust-package) python3 .ci/check_package.py ;;
+              js-package) python3 .ci/check_web.py ;;
+              jsr-package) python3 .ci/check_jsr.py ;;
+              jsr-registry) python3 .ci/check_jsr_registry.py ;;
+              python-package) python3 .ci/check_python.py ;;
+              python-prepare) python3 .ci/check_python.py --resolve-only ;;
+              python-registry) python3 .ci/check_python_registry.py ;;
+              *) echo "::error::No hosted route for $selector" >&2; exit 1 ;;
+            esac
+            echo "::endgroup::"
+          done
+
+      - name: Record the check result
+        if: always() && steps.plan.outcome == 'success'
+        env:
+          CHECK_OUTCOME: ${{ steps.checks.outcome }}
+        shell: bash
+        run: |
+          python3 - <<'PYTHON'
+          import json
+          import os
+          from pathlib import Path
+          path = Path(os.environ['ARTIFACT_ROOT']) / 'hosted-run.json'
+          receipt = json.loads(path.read_text())
+          receipt['status'] = os.environ['CHECK_OUTCOME']
+          path.write_text(json.dumps(receipt, indent=2) + '\n')
+          PYTHON
+
+      - name: Retain exact packages and check receipts
+        if: always() && steps.plan.outcome == 'success'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: selected-checks-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-artifacts
+          if-no-files-found: error
+          retention-days: 14

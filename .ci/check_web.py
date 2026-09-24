@@ -11,6 +11,8 @@ import tarfile
 import tempfile
 import tomllib
 
+from artifact_root import output_directory
+
 
 def run(*args, **kwargs):
     return subprocess.run(args, check=True, **kwargs)
@@ -56,8 +58,7 @@ if build.returncode:
 built_packages = {entry["package_id"] for line in build.stdout.splitlines()
                   if (entry := json.loads(line)).get("reason") == "compiler-artifact"}
 
-output = Path(os.environ["CARGO_HOME"]) / "ccid-artifacts" / os.environ["CI_COMMIT_SHA"] / "web"
-output.mkdir(parents=True, exist_ok=True)
+output = output_directory("web")
 with tempfile.TemporaryDirectory(prefix="ccht-web-", dir=os.environ.get("TMPDIR")) as directory:
     stage = Path(directory) / "package"
     shutil.copytree(root / "web", stage, ignore=shutil.ignore_patterns("wasm", "source", "node_modules", "*.tgz"))
@@ -72,7 +73,7 @@ with tempfile.TemporaryDirectory(prefix="ccht-web-", dir=os.environ.get("TMPDIR"
     staged_manifest["gitHead"] = os.environ["CI_COMMIT_SHA"]
     manifest_path.write_text(json.dumps(staged_manifest, indent=2) + "\n")
     (stage / "LICENSES").mkdir(exist_ok=True)
-    for name in ("LGPL-3.0-only.txt", "LGPL-3.0-only WITH LGPL-3.0-linking-exception.txt", "LGPL-3.0-linking-exception.txt", "GPL-3.0-only.txt"):
+    for name in ("LGPL-3.0-only.txt", "LGPL-3.0-linking-exception.txt", "GPL-3.0-only.txt"):
         shutil.copy2(root / "LICENSES" / name, stage / "LICENSES" / name)
     # Exact corresponding Rust source and generator inputs accompany the binary.
     source = stage / "source"
@@ -137,7 +138,7 @@ with tempfile.TemporaryDirectory(prefix="ccht-web-", dir=os.environ.get("TMPDIR"
     assert manifest["name"] == "@corbet-labs/ccht"
     assert manifest["license"] == "LGPL-3.0-only WITH LGPL-3.0-linking-exception"
     assert manifest["version"] == package["version"]
-    for name in ("LICENSE", "LICENSES/LGPL-3.0-only.txt", "LICENSES/LGPL-3.0-only WITH LGPL-3.0-linking-exception.txt", "LICENSES/LGPL-3.0-linking-exception.txt", "LICENSES/GPL-3.0-only.txt"):
+    for name in ("LICENSE", "LICENSES/LGPL-3.0-only.txt", "LICENSES/LGPL-3.0-linking-exception.txt", "LICENSES/GPL-3.0-only.txt"):
         assert (module / name).read_bytes() == (root / name).read_bytes()
     assert (module / "source/src/conversation.rs").read_bytes() == (root / "src/conversation.rs").read_bytes()
     assert (module / "source/.ci/wasm-bundle/src/main.rs").is_file()
@@ -168,7 +169,7 @@ with tempfile.TemporaryDirectory(prefix="ccht-web-", dir=os.environ.get("TMPDIR"
     (output / "receipt.json").write_text(json.dumps(report, indent=2) + "\n")
     release_receipt = {"schema": 1, "package": package["name"], "version": package["version"],
                        "commit": os.environ["CI_COMMIT_SHA"], "source_sha256": os.environ["SOURCE_SHA256"],
-                       "check": "js-package", "tool_revision": os.environ["CCID_REVISION"],
+                       "check": "js-package", "tool_revision": os.environ.get("CCID_REVISION"),
                        "artifacts": {archive.name: report["archive_sha256"]},
                        "offline_source_rebuild": "passed", "independent_consumer": "passed"}
     (output / "js-package.json").write_text(json.dumps(release_receipt, indent=2) + "\n")

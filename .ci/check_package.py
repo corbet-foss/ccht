@@ -10,6 +10,8 @@ import tarfile
 import tempfile
 import tomllib
 
+from artifact_root import output_directory
+
 
 metadata = json.loads(
     subprocess.check_output(
@@ -29,7 +31,6 @@ required_notices = {
         "LICENSE",
         "LICENSE.md",
         "LICENSES/LGPL-3.0-only.txt",
-        "LICENSES/LGPL-3.0-only WITH LGPL-3.0-linking-exception.txt",
         "LICENSES/LGPL-3.0-linking-exception.txt",
         "LICENSES/GPL-3.0-only.txt",
     )
@@ -57,7 +58,6 @@ with tempfile.TemporaryDirectory(prefix="ccht-package-", dir=os.environ.get("TMP
     if packaged_licenses != [
         "GPL-3.0-only.txt",
         "LGPL-3.0-linking-exception.txt",
-        "LGPL-3.0-only WITH LGPL-3.0-linking-exception.txt",
         "LGPL-3.0-only.txt",
     ]:
         raise ValueError("Packaged license inventory differs from the current grant")
@@ -95,13 +95,12 @@ report = {
         for name, contents in required_notices.items()
     },
 }
-output = Path(os.environ["CARGO_HOME"]) / "ccid-artifacts" / os.environ["CI_COMMIT_SHA"]
-output.mkdir(parents=True, exist_ok=True)
+output = output_directory()
 shutil.copy2(archive, output / archive.name)
 (output / "package-license.json").write_text(json.dumps(report, indent=2) + "\n")
 release_receipt = {"schema": 1, "package": package["name"], "version": package["version"],
                    "commit": os.environ["CI_COMMIT_SHA"], "source_sha256": os.environ["SOURCE_SHA256"],
-                   "check": "rust-package", "tool_revision": os.environ["CCID_REVISION"],
+                   "check": "rust-package", "tool_revision": os.environ.get("CCID_REVISION"),
                    "artifacts": {archive.name: report["archive_sha256"]}, "independent_consumer": "passed"}
 (output / "rust-package.json").write_text(json.dumps(release_receipt, indent=2) + "\n")
 (output / "SOURCE_COMMIT").write_text(os.environ["CI_COMMIT_SHA"] + "\n")

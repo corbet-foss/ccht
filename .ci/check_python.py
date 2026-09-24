@@ -16,6 +16,8 @@ import tempfile
 import tomllib
 import zipfile
 
+from artifact_root import output_directory
+
 
 def run(*args, **kwargs):
     print("+ " + " ".join(map(str, args)), flush=True)
@@ -100,8 +102,7 @@ os.environ["MATURIN_NO_INSTALL_RUST"] = "1"
 project = tomllib.loads((source / "pyproject.toml").read_text())["project"]
 version = project["version"]
 assert project["name"] == "ccht" and project["license"] == "LGPL-3.0-only WITH LGPL-3.0-linking-exception"
-output = Path(os.environ["CARGO_HOME"]) / "ccid-artifacts" / os.environ["CI_COMMIT_SHA"] / "python"
-output.mkdir(parents=True, exist_ok=True)
+output = output_directory("python")
 if args.resolve_only:
     run("cargo", "generate-lockfile", "--manifest-path", source / "Cargo.toml")
     lock = (source / "Cargo.lock").read_bytes()
