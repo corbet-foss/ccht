@@ -76,19 +76,9 @@ assert config["name"] == manifest["name"] and config["version"] == manifest["ver
 assert config["exports"]["."] == "./index.js"
 assert config["exports"]["./auth"] == "./src/auth.ts"
 assert config["exports"]["./dock"] == "./src/dock.ts"
-assert (
-    config["exports"]["./components/AccountConnection.svelte"]
-    == "./src/components/AccountConnection.svelte"
-)
-assert config["exports"]["./components/Dock.svelte"] == "./src/components/Dock.svelte"
-assert (
-    config["exports"]["./components/ChatDock.svelte"]
-    == "./src/components/ChatDock.svelte"
-)
-assert (
-    config["exports"]["./components/StepConfig.svelte"]
-    == "./src/components/StepConfig.svelte"
-)
+# JSR exports only JavaScript/TypeScript modules; Deno cannot parse Svelte
+# single-file components, so they ship as files and are imported from npm.
+assert not any(name.endswith(".svelte") for name in config["exports"])
 assert "src/**" in config["publish"]["include"]
 # JSR limits the sum of package files to 20 MB. XZ preserves the original tar
 # byte for byte while reducing the corresponding source kit below this limit.

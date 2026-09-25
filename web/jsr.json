@@ -5,11 +5,7 @@
   "exports": {
     ".": "./index.js",
     "./auth": "./src/auth.ts",
-    "./dock": "./src/dock.ts",
-    "./components/AccountConnection.svelte": "./src/components/AccountConnection.svelte",
-    "./components/ChatDock.svelte": "./src/components/ChatDock.svelte",
-    "./components/Dock.svelte": "./src/components/Dock.svelte",
-    "./components/StepConfig.svelte": "./src/components/StepConfig.svelte"
+    "./dock": "./src/dock.ts"
   },
   "publish": {
     "include": [
