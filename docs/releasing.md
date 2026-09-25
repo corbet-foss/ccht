@@ -57,10 +57,18 @@ tag stays the release identity for all four.
    phase bundle as `tag-phase-publication-bundle.*` on the release, and replaces
    `publication-bundle.*` with the extended bundle. `publish` uploads JSR
    through GitHub OIDC (`RELEASE_JSR_AUTH=trusted`) and reports PyPI as deferred.
+   Add `-f complete_channels=pypi` to complete PyPI alone; JSR then stays out
+   of the bundle until a later completion.
 7. Upload PyPI from the extended bundle (operator upload below, channel `pypi`).
 8. Run the published-consumer checks (`jsr-registry`, `python-registry`) and
    state the status per registry. A successful upload response or version
    collision is insufficient proof.
+
+The generated JSR package also requires the npm archive's top-level
+`README.md` (from `web/README.md`) to carry the source extraction instruction
+`tar -xzf dependencies.tar.gz` and each `.ci/jsr-readme-replacements.json`
+paragraph exactly once, like `source/README.md`. 0.2.10's npm README lacks
+them, so JSR was deferred to the next release: fix `web/README.md` before its tag.
 
 JSR accepts neither whitespace in package paths nor the
 `LGPL-3.0-only WITH LGPL-3.0-linking-exception` expression, so `web/jsr.json`

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- JSR: 0.2.10 was not published there. Its npm `README.md` (from
+  `web/README.md`) lacks the source extraction instruction and the
+  replacement paragraphs the generated-JSR contract requires; add them before
+  the next release so JSR catches up (docs/releasing.md).
+- JSR exports only JavaScript and TypeScript modules; the Svelte components
+  stay npm imports.
+
 ## 0.2.10 - 2026-09-25
 
 - 0.2.9 reached crates.io only. Its npm upload of the 19 MB tarball timed out

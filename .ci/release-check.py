@@ -110,10 +110,12 @@ def main():
     require("id-token: write" in jobs["publish"] and hosted.count("id-token") == 1,
             "Only the publication job may request OIDC tokens")
     # ccht releases one version in two phases: the tag bundles Cargo and npm; the
-    # completion bundles JSR and PyPI, whose inputs need those uploads first.
+    # completion bundles JSR and/or PyPI, whose inputs need those uploads first.
     require("'release-config,jsr-package,python-package'" in jobs["prepare"]
+            and "'release-config,python-package'" in jobs["prepare"]
             and "'release-config,rust,core,licenses,rust-package,js-package'" in jobs["prepare"]
-            and "('jsr', 'pypi') if complete else ('cargo', 'npm')" in jobs["bundle"],
+            and "split(',')) if complete else ('cargo', 'npm')" in jobs["bundle"]
+            and "<= {'jsr', 'pypi'}" in jobs["bundle"],
             "Unexpected release phase selection")
     publish = jobs["publish"]
     require("RELEASE_CARGO_AUTH: trusted" in publish and "steps.authentication.outputs.token" in publish

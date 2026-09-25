@@ -9,7 +9,8 @@ name: Release
 # The Python binding resolves the ccht crate from crates.io, and JSR is generated
 # from the published npm archive (.ci/jsr-input.json), so both need a follow-up
 # commit on main after those uploads. Dispatch with the tag and `complete` then
-# prepares JSR and PyPI at that branch and extends the release's bundle; the
+# prepares JSR and PyPI (or PyPI alone, `complete_channels: pypi`) at that branch
+# and extends the release's bundle; the
 # original tag stays the release identity (docs/releasing.md).
 # Dispatch with a tag alone reconciles and publishes from that release's bundle.
 # Dispatch without a tag rehearses the tag phase for the selected branch; it
@@ -29,6 +30,11 @@ on:
         type: boolean
         required: false
         default: false
+      complete_channels:
+        description: Registries a completion adds; pypi alone leaves JSR for a later completion
+        type: choice
+        options: ['jsr,pypi', 'pypi']
+        default: 'jsr,pypi'
 
 permissions:
   contents: read
@@ -41,6 +47,7 @@ env:
   CCID_REVISION: 3175c51005006f6050033a55b3da033333ecf84d
   RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
   RELEASE_COMPLETE: ${{ github.event_name == 'workflow_dispatch' && inputs.complete }}
+  RELEASE_COMPLETE_CHANNELS: ${{ inputs.complete_channels }}
 
 jobs:
   prepare:
@@ -49,7 +56,7 @@ jobs:
       contents: read
     uses: ./.github/workflows/ci.yml
     with:
-      checks: ${{ (github.event_name == 'workflow_dispatch' && inputs.complete) && 'release-config,jsr-package,python-package' || 'release-config,rust,core,licenses,rust-package,js-package' }}
+      checks: ${{ (github.event_name == 'workflow_dispatch' && inputs.complete) && (inputs.complete_channels == 'pypi' && 'release-config,python-package' || 'release-config,jsr-package,python-package') || 'release-config,rust,core,licenses,rust-package,js-package' }}
 
   bundle:
     needs: prepare
@@ -143,7 +150,9 @@ jobs:
           # into its own directory below the commit.
           directories = {'cargo': prepared, 'npm': prepared / 'web', 'jsr': prepared / 'jsr', 'pypi': prepared / 'python'}
           complete = os.environ['RELEASE_COMPLETE'] == 'true'
-          selected = ('jsr', 'pypi') if complete else ('cargo', 'npm')
+          selected = tuple(os.environ['RELEASE_COMPLETE_CHANNELS'].split(',')) if complete else ('cargo', 'npm')
+          if not selected or not set(selected) <= {'jsr', 'pypi'}:
+              raise SystemExit('A completion adds JSR and/or PyPI only')
           channels = {registry: {'source_archive': str(source), 'artifacts': str(directories[registry]),
                                  'hosted_receipt': str(receipt)} for registry in selected}
           tag_commit = commit
